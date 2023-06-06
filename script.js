@@ -82,33 +82,63 @@ class TextCutter {
         this.sendToBackend(extractedText);
       }
     }
-  
-    sendToBackend(textChunk) {
+
+    async sendToBackend(textChunk) {
       const model = {
         Language: 'ka',
         Text: textChunk,
         Voice: 0,
         IterationCount: 2
       };
-  
-      this.refreshTokenIfNeeded();
-  
-      fetch('https://enagramm.com/API/TTS/SynthesizeTextAudioPath', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.accessToken}`
-        },
-        body: JSON.stringify(model)
-      })
-        .then(response => response.json())
-        .then(result => {
-          var sourceUrl = result.AudioFilePath;
-          this.onresult({ sourceUrl });
-        })
-        .catch(error => {
-          console.error('Error:', error);
+    
+      await this.refreshTokenIfNeeded();
+    
+      try {
+        const response = await fetch('https://enagramm.com/API/TTS/SynthesizeTextAudioPath', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.accessToken}`
+          },
+          body: JSON.stringify(model)
         });
+    
+        if (response.ok) {
+          const result = await response.json();
+          const sourceUrl = result.AudioFilePath;
+          this.onresult({ sourceUrl });
+    
+          // Continue processing the remaining text chunks
+          if (this.text.length > 0) {
+            this.processText();
+          }
+        } else {
+          throw new Error('Request failed');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    }
+    
+    processText() {
+      if (this.text.length > 0) {
+        let endIndex = 230;
+    
+        if (this.text.length > 150) {
+          const subText = this.text.substring(150, 230);
+          const punctuationIndex = this.findPunctuationIndex(subText);
+    
+          if (punctuationIndex !== -1) {
+            endIndex = 150 + punctuationIndex + 1;
+          }
+        } else {
+          endIndex = this.text.length;
+        }
+    
+        const extractedText = this.text.substring(0, endIndex);
+        this.text = this.text.substring(endIndex);
+        this.sendToBackend(extractedText);
+      }
     }
   
     findPunctuationIndex(text) {
